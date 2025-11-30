@@ -8,6 +8,7 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
         console.log("User logged in:", user.email);
+        updateUIForAuthState();
         loadEvents(); 
         
         // If on edit page, load event details
@@ -19,14 +20,46 @@ onAuthStateChanged(auth, (user) => {
             }
         }
     } else {
-        // Allow access to login/signup pages without redirect loop
-        if (!window.location.pathname.includes('login.html') && !window.location.pathname.includes('signup.html') && !window.location.pathname.includes('index.html')) {
-             window.location.href = 'login.html';
+        // Guest users can view calendar pages
+        currentUser = null;
+        updateUIForAuthState();
+        
+        // Only redirect to login if trying to access create/edit pages
+        if (window.location.pathname.includes('create_event.html') || 
+            window.location.pathname.includes('edit_event.html')) {
+            alert('Please login to create or edit events');
+            window.location.href = 'login.html';
+        }
+        // If on a view page (monthly, weekly, daily), load events for guests
+        else if (window.location.pathname.includes('monthly_view.html') ||
+                 window.location.pathname.includes('weekly_view.html') ||
+                 window.location.pathname.includes('daily_view.html')) {
+            loadEvents();
         }
     }
 });
 
 const logoutBtn = document.getElementById('logoutBtn');
+const loginBtn = document.getElementById('loginBtn');
+const newEventBtn = document.getElementById('newEventBtn');
+const newEventLink = document.getElementById('newEventLink');
+
+function updateUIForAuthState() {
+    if (currentUser) {
+        // Logged in user
+        if (logoutBtn) logoutBtn.style.display = 'inline-block';
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (newEventBtn) newEventBtn.style.display = 'inline-block';
+        if (newEventLink) newEventLink.style.display = 'inline-block';
+    } else {
+        // Guest user
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'inline-block';
+        if (newEventBtn) newEventBtn.style.display = 'none';
+        if (newEventLink) newEventLink.style.display = 'none';
+    }
+}
+
 if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
         try {
@@ -35,6 +68,12 @@ if (logoutBtn) {
         } catch (error) {
             console.error("Logout error:", error);
         }
+    });
+}
+
+if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+        window.location.href = 'login.html';
     });
 }
 
@@ -353,18 +392,26 @@ if (window.location.pathname.includes('monthly_view.html')) {
 }
 
 async function loadEvents() {
-    if (!currentUser) return;
-    
     // Only load events if we are on a view page
     if (!document.getElementById('calendarGrid') && !document.getElementById('weeklyGrid') && !document.getElementById('dailyGrid')) return;
 
-    const q = query(collection(db, "events"), where("userId", "==", currentUser.uid));
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    
+    if (currentUser) {
+        // Logged-in users: show all events, but only allow editing their own
+        const q = query(collection(db, "events"));
+        querySnapshot = await getDocs(q);
+    } else {
+        // Guest users: show all events (read-only)
+        const q = query(collection(db, "events"));
+        querySnapshot = await getDocs(q);
+    }
     
     querySnapshot.forEach((doc) => {
         const event = doc.data();
         const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
         const eventHour = event.startDateTime.toDate().getHours();
+        const isOwnEvent = currentUser && currentUser.uid === event.userId;
 
         // Monthly View
         if (calendarGrid) {
@@ -373,19 +420,20 @@ async function loadEvents() {
                 const eventDiv = document.createElement('div');
                 eventDiv.className = 'event-item';
                 eventDiv.textContent = event.title;
+                eventDiv.style.cursor = 'pointer';
+                
+                // Show detail modal for all events
                 eventDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    window.location.href = `edit_event.html?id=${doc.id}`;
+                    showEventDetailModal(doc.id, event, isOwnEvent);
                 });
+                
                 dayCell.appendChild(eventDiv);
             }
         }
 
         // Weekly & Daily View
         if (weeklyGrid || dailyGrid) {
-            // Find cell by date and hour
-            // Note: This is a simple implementation that puts event in the start hour slot.
-            // Does not span multiple hours visually in this grid, but lists it.
             const selector = `.day-column[data-date="${eventDate}"][data-hour="${eventHour}"]`;
             const cell = document.querySelector(selector);
             
@@ -394,12 +442,77 @@ async function loadEvents() {
                 eventDiv.className = 'event-block';
                 eventDiv.textContent = `${event.title}`;
                 eventDiv.title = event.description || event.title;
+                eventDiv.style.cursor = 'pointer';
+                
+                // Show detail modal for all events
                 eventDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    window.location.href = `edit_event.html?id=${doc.id}`;
+                    showEventDetailModal(doc.id, event, isOwnEvent);
                 });
+                
                 cell.appendChild(eventDiv);
             }
         }
     });
 }
+
+// Event Detail Modal Logic
+const eventDetailModal = document.getElementById('eventDetailModal');
+const closeDetailModal = document.getElementById('closeDetailModal');
+const closeDetailBtn = document.getElementById('closeDetailBtn');
+const editEventBtn = document.getElementById('editEventBtn');
+
+let currentEventId = null;
+
+function showEventDetailModal(eventId, event, canEdit) {
+    currentEventId = eventId;
+    
+    // Populate modal with event details
+    document.getElementById('detailEventTitle').textContent = event.title;
+    
+    const startDate = event.startDateTime.toDate();
+    const endDate = event.endDateTime.toDate();
+    const dateTimeStr = `${startDate.toLocaleString()} - ${endDate.toLocaleString()}`;
+    document.getElementById('detailEventDateTime').textContent = dateTimeStr;
+    
+    document.getElementById('detailEventLocation').textContent = event.location || 'N/A';
+    document.getElementById('detailEventDescription').textContent = event.description || 'No description';
+    
+    // Show edit button only if user can edit
+    if (canEdit) {
+        editEventBtn.style.display = 'inline-block';
+    } else {
+        editEventBtn.style.display = 'none';
+    }
+    
+    // Show modal
+    eventDetailModal.style.display = 'flex';
+}
+
+function closeEventDetailModal() {
+    eventDetailModal.style.display = 'none';
+    currentEventId = null;
+}
+
+if (closeDetailModal) {
+    closeDetailModal.addEventListener('click', closeEventDetailModal);
+}
+
+if (closeDetailBtn) {
+    closeDetailBtn.addEventListener('click', closeEventDetailModal);
+}
+
+if (editEventBtn) {
+    editEventBtn.addEventListener('click', () => {
+        if (currentEventId) {
+            window.location.href = `edit_event.html?id=${currentEventId}`;
+        }
+    });
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', (e) => {
+    if (e.target === eventDetailModal) {
+        closeEventDetailModal();
+    }
+});
