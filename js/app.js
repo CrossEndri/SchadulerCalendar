@@ -361,5 +361,32 @@ async function loadEvents() {
                 cell.appendChild(eventDiv);
             }
         }
+
+        async function loadEvents() {
+    if (!currentUser) return;
+
+    try {
+        const q = query(collection(db, "events"), where("userId", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
+
+        const events = [];
+        querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            events.push({
+                id: docSnap.id,
+                title: data.title,
+                start: data.startDateTime.toDate(),
+                end: data.endDateTime.toDate()
+            });
+        });
+
+        console.log("Loaded Events:", events);
+
+        renderEvents(events);
+
+    } catch (error) {
+        console.error("Error loading events:", error);
+        }
+    }
     });
 }
