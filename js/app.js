@@ -64,7 +64,7 @@ if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
         try {
             await signOut(auth);
-            window.location.href = 'login.html';
+            window.location.href = 'monthly_view.html';
         } catch (error) {
             console.error("Logout error:", error);
         }
