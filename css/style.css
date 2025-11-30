@@ -1,0 +1,200 @@
+:root {
+    --primary-color: #4f46e5;
+    --primary-hover: #4338ca;
+    --bg-color: #f3f4f6;
+    --text-color: #1f2937;
+    --white: #ffffff;
+    --border-color: #e5e7eb;
+    --danger-color: #ef4444;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.auth-container {
+    max-width: 400px;
+    margin: 100px auto;
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-top: 0.25rem;
+}
+
+button {
+    background-color: var(--primary-color);
+    color: var(--white);
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 100%;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: var(--primary-hover);
+}
+
+.secondary-btn {
+    background-color: var(--white);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.secondary-btn:hover {
+    background-color: var(--bg-color);
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    background: var(--white);
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.view-controls {
+    display: flex;
+    gap: 1rem;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border-color);
+    border: 1px solid var(--border-color);
+}
+
+.calendar-day {
+    background: var(--white);
+    min-height: 120px;
+    padding: 0.5rem;
+    position: relative;
+}
+
+.calendar-day-header {
+    text-align: center;
+    padding: 0.5rem;
+    background: var(--white);
+    font-weight: 600;
+}
+
+.event-item {
+    background-color: #e0e7ff;
+    color: #3730a3;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-links {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.nav-links a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Weekly and Daily View Styles */
+.weekly-grid {
+    display: grid;
+    grid-template-columns: 50px repeat(7, 1fr);
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    overflow-x: auto;
+}
+
+.daily-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    background: var(--white);
+    border: 1px solid var(--border-color);
+}
+
+.time-slot {
+    border-bottom: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    height: 50px;
+    padding: 5px;
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-align: right;
+    padding-right: 10px;
+}
+
+.day-column {
+    border-right: 1px solid var(--border-color);
+    min-width: 100px;
+    position: relative;
+}
+
+.day-header {
+    text-align: center;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    background: #f9fafb;
+}
+
+.event-block {
+    background-color: #e0e7ff;
+    color: #3730a3;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin: 1px;
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
