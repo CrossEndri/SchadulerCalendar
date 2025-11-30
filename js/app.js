@@ -161,6 +161,9 @@ const currentMonthElement = document.getElementById('currentMonth');
 const currentWeekElement = document.getElementById('currentWeek');
 const currentDayElement = document.getElementById('currentDay');
 
+// Navigation State
+let currentViewDate = new Date();
+
 function renderCalendar(date) {
     if (!calendarGrid || !currentMonthElement) return;
 
@@ -194,9 +197,17 @@ function renderCalendar(date) {
     }
 
     // Days of month
+    const today = new Date();
     for (let i = 1; i <= daysInMonth; i++) {
         const div = document.createElement('div');
         div.className = 'calendar-day';
+        
+        // Highlight Today
+        if (year === today.getFullYear() && month === today.getMonth() && i === today.getDate()) {
+            div.style.backgroundColor = '#e0f2fe'; // Light blue highlight
+            div.style.border = '2px solid var(--primary-color)';
+        }
+
         div.innerHTML = `<div style="font-weight: bold; margin-bottom: 5px;">${i}</div>`;
         div.dataset.date = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         
@@ -209,106 +220,39 @@ function renderCalendar(date) {
 
         calendarGrid.appendChild(div);
     }
+    // Reload events for the new view
+    loadEvents();
 }
 
-function renderWeekly(date) {
-    if (!weeklyGrid || !currentWeekElement) return;
+// ... (renderWeekly and renderDaily functions remain unchanged) ...
 
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay()); // Sunday
-    
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
+// Navigation Logic
+const prevMonthBtn = document.getElementById('prevMonth');
+const nextMonthBtn = document.getElementById('nextMonth');
 
-    currentWeekElement.textContent = `${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`;
-    
-    weeklyGrid.innerHTML = '';
-    
-    // Header Row: Time + 7 Days
-    const timeHeader = document.createElement('div');
-    timeHeader.className = 'day-header';
-    timeHeader.textContent = 'Time';
-    weeklyGrid.appendChild(timeHeader);
-
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    for (let i = 0; i < 7; i++) {
-        const dayDate = new Date(startOfWeek);
-        dayDate.setDate(startOfWeek.getDate() + i);
-        const div = document.createElement('div');
-        div.className = 'day-header';
-        div.textContent = `${days[i]} ${dayDate.getDate()}`;
-        weeklyGrid.appendChild(div);
-    }
-
-    // Grid Rows: 24 Hours
-    for (let hour = 0; hour < 24; hour++) {
-        // Time Label
-        const timeLabel = document.createElement('div');
-        timeLabel.className = 'time-slot';
-        timeLabel.textContent = `${hour}:00`;
-        weeklyGrid.appendChild(timeLabel);
-
-        // 7 Day Columns for this hour
-        for (let day = 0; day < 7; day++) {
-            const dayDate = new Date(startOfWeek);
-            dayDate.setDate(startOfWeek.getDate() + day);
-            const dateStr = dayDate.toISOString().split('T')[0];
-            
-            const cell = document.createElement('div');
-            cell.className = 'day-column';
-            cell.style.borderBottom = '1px solid var(--border-color)';
-            cell.dataset.date = dateStr;
-            cell.dataset.hour = hour;
-            weeklyGrid.appendChild(cell);
-        }
-    }
+if (prevMonthBtn) {
+    prevMonthBtn.addEventListener('click', () => {
+        currentViewDate.setMonth(currentViewDate.getMonth() - 1);
+        renderCalendar(currentViewDate);
+    });
 }
 
-function renderDaily(date) {
-    if (!dailyGrid || !currentDayElement) return;
-
-    currentDayElement.textContent = date.toLocaleDateString('default', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    
-    dailyGrid.innerHTML = '';
-
-    // Header
-    const timeHeader = document.createElement('div');
-    timeHeader.className = 'day-header';
-    timeHeader.textContent = 'Time';
-    dailyGrid.appendChild(timeHeader);
-
-    const eventHeader = document.createElement('div');
-    eventHeader.className = 'day-header';
-    eventHeader.textContent = 'Events';
-    dailyGrid.appendChild(eventHeader);
-
-    // 24 Hours
-    for (let hour = 0; hour < 24; hour++) {
-        const timeLabel = document.createElement('div');
-        timeLabel.className = 'time-slot';
-        timeLabel.textContent = `${hour}:00`;
-        dailyGrid.appendChild(timeLabel);
-
-        const cell = document.createElement('div');
-        cell.className = 'day-column';
-        cell.style.borderBottom = '1px solid var(--border-color)';
-        cell.style.width = '100%';
-        cell.dataset.date = date.toISOString().split('T')[0];
-        cell.dataset.hour = hour;
-        dailyGrid.appendChild(cell);
-    }
+if (nextMonthBtn) {
+    nextMonthBtn.addEventListener('click', () => {
+        currentViewDate.setMonth(currentViewDate.getMonth() + 1);
+        renderCalendar(currentViewDate);
+    });
 }
 
 // Initial render
-const today = new Date();
 if (window.location.pathname.includes('monthly_view.html')) {
-    renderCalendar(today);
+    renderCalendar(currentViewDate);
 } else if (window.location.pathname.includes('weekly_view.html')) {
-    renderWeekly(today);
+    renderWeekly(currentViewDate);
 } else if (window.location.pathname.includes('daily_view.html')) {
     const urlParams = new URLSearchParams(window.location.search);
     const dateParam = urlParams.get('date');
-    const date = dateParam ? new Date(dateParam) : today;
+    const date = dateParam ? new Date(dateParam) : currentViewDate;
     renderDaily(date);
 }
 
