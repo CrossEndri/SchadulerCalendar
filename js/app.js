@@ -305,12 +305,20 @@ if (window.location.pathname.includes('monthly_view.html')) {
     renderCalendar(today);
 } else if (window.location.pathname.includes('weekly_view.html')) {
     renderWeekly(today);
-} else if (window.location.pathname.includes('daily_view.html')) {
+} import { loadDailyEvents } from './daily-events.js';
+
+if (window.location.pathname.includes('daily_view.html')) {
     const urlParams = new URLSearchParams(window.location.search);
     const dateParam = urlParams.get('date');
     const date = dateParam ? new Date(dateParam) : today;
+
     renderDaily(date);
+
+    setTimeout(() => {
+        loadDailyEvents(currentUser.uid, date.toISOString().split("T")[0]);
+    }, 500);
 }
+
 
 async function loadEvents() {
     if (!currentUser) return;
