@@ -4,12 +4,38 @@ import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, g
 
 let currentUser = null;
 
+// Toast helper
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// Write notification to Firestore
+async function addNotificationRecord(type, eventId, title) {
+    try {
+        await addDoc(collection(db, "notifications"), {
+            userId: currentUser.uid,
+            type,
+            eventId,
+            title,
+            timestamp: Timestamp.now()
+        });
+    } catch (e) {
+        console.error("Failed to write notification:", e);
+    }
+}
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
         console.log("User logged in:", user.email);
-        loadEvents(); 
-        
+        loadEvents();
+
         // If on edit page, load event details
         if (window.location.pathname.includes('edit_event.html')) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -21,7 +47,7 @@ onAuthStateChanged(auth, (user) => {
     } else {
         // Allow access to login/signup pages without redirect loop
         if (!window.location.pathname.includes('login.html') && !window.location.pathname.includes('signup.html') && !window.location.pathname.includes('index.html')) {
-             window.location.href = 'login.html';
+            window.location.href = 'login.html';
         }
     }
 });
@@ -52,7 +78,7 @@ if (createEventForm) {
         const location = document.getElementById('location').value;
 
         try {
-            await addDoc(collection(db, "events"), {
+            const docRef = await addDoc(collection(db, "events"), {
                 userId: currentUser.uid,
                 title,
                 description,
@@ -60,6 +86,9 @@ if (createEventForm) {
                 endDateTime: Timestamp.fromDate(new Date(endDateTime)),
                 location
             });
+            // Show toast and store notification
+            showToast('Event created successfully');
+            await addNotificationRecord('create', docRef.id, title);
             window.location.href = 'monthly_view.html';
         } catch (error) {
             console.error("Error adding event: ", error);
@@ -104,7 +133,7 @@ if (editEventForm) {
 if (deleteEventBtn) {
     deleteEventBtn.addEventListener('click', async () => {
         if (!confirm("Are you sure you want to delete this event?")) return;
-        
+
         const eventId = document.getElementById('eventId').value;
         try {
             await deleteDoc(doc(db, "events", eventId));
@@ -126,11 +155,11 @@ async function loadEventDetails(eventId) {
             document.getElementById('eventId').value = eventId;
             document.getElementById('title').value = data.title;
             document.getElementById('description').value = data.description;
-            
+
             // Format dates for datetime-local input (YYYY-MM-DDTHH:MM)
             const start = data.startDateTime.toDate();
             const end = data.endDateTime.toDate();
-            
+
             const formatDateTime = (date) => {
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -166,7 +195,7 @@ function renderCalendar(date) {
 
     const year = date.getFullYear();
     const month = date.getMonth();
-    
+
     currentMonthElement.textContent = new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
 
     // Clear previous
@@ -199,12 +228,12 @@ function renderCalendar(date) {
         div.className = 'calendar-day';
         div.innerHTML = `<div style="font-weight: bold; margin-bottom: 5px;">${i}</div>`;
         div.dataset.date = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        
+
         // Click to go to daily view
         div.addEventListener('click', (e) => {
-             if(e.target === div || e.target.parentElement === div) {
+            if (e.target === div || e.target.parentElement === div) {
                 window.location.href = `daily_view.html?date=${div.dataset.date}`;
-             }
+            }
         });
 
         calendarGrid.appendChild(div);
@@ -216,14 +245,14 @@ function renderWeekly(date) {
 
     const startOfWeek = new Date(date);
     startOfWeek.setDate(date.getDate() - date.getDay()); // Sunday
-    
+
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
 
     currentWeekElement.textContent = `${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`;
-    
+
     weeklyGrid.innerHTML = '';
-    
+
     // Header Row: Time + 7 Days
     const timeHeader = document.createElement('div');
     timeHeader.className = 'day-header';
@@ -253,7 +282,7 @@ function renderWeekly(date) {
             const dayDate = new Date(startOfWeek);
             dayDate.setDate(startOfWeek.getDate() + day);
             const dateStr = dayDate.toISOString().split('T')[0];
-            
+
             const cell = document.createElement('div');
             cell.className = 'day-column';
             cell.style.borderBottom = '1px solid var(--border-color)';
@@ -268,7 +297,7 @@ function renderDaily(date) {
     if (!dailyGrid || !currentDayElement) return;
 
     currentDayElement.textContent = date.toLocaleDateString('default', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    
+
     dailyGrid.innerHTML = '';
 
     // Header
@@ -322,13 +351,13 @@ if (window.location.pathname.includes('daily_view.html')) {
 
 async function loadEvents() {
     if (!currentUser) return;
-    
+
     // Only load events if we are on a view page
     if (!document.getElementById('calendarGrid') && !document.getElementById('weeklyGrid') && !document.getElementById('dailyGrid')) return;
 
     const q = query(collection(db, "events"), where("userId", "==", currentUser.uid));
     const querySnapshot = await getDocs(q);
-    
+
     querySnapshot.forEach((doc) => {
         const event = doc.data();
         const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
@@ -356,7 +385,7 @@ async function loadEvents() {
             // Does not span multiple hours visually in this grid, but lists it.
             const selector = `.day-column[data-date="${eventDate}"][data-hour="${eventHour}"]`;
             const cell = document.querySelector(selector);
-            
+
             if (cell) {
                 const eventDiv = document.createElement('div');
                 eventDiv.className = 'event-block';
@@ -371,30 +400,30 @@ async function loadEvents() {
         }
 
         async function loadEvents() {
-    if (!currentUser) return;
+            if (!currentUser) return;
 
-    try {
-        const q = query(collection(db, "events"), where("userId", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
+            try {
+                const q = query(collection(db, "events"), where("userId", "==", currentUser.uid));
+                const querySnapshot = await getDocs(q);
 
-        const events = [];
-        querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            events.push({
-                id: docSnap.id,
-                title: data.title,
-                start: data.startDateTime.toDate(),
-                end: data.endDateTime.toDate()
-            });
-        });
+                const events = [];
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    events.push({
+                        id: docSnap.id,
+                        title: data.title,
+                        start: data.startDateTime.toDate(),
+                        end: data.endDateTime.toDate()
+                    });
+                });
 
-        console.log("Loaded Events:", events);
+                console.log("Loaded Events:", events);
 
-        renderEvents(events);
+                renderEvents(events);
 
-    } catch (error) {
-        console.error("Error loading events:", error);
+            } catch (error) {
+                console.error("Error loading events:", error);
+            }
         }
-    }
     });
 }
