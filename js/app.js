@@ -1,6 +1,7 @@
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { initializeNotifications, stopNotifications } from './notifications.js';
 
 let currentUser = null;
 
@@ -10,6 +11,8 @@ onAuthStateChanged(auth, (user) => {
         console.log("User logged in:", user.email);
         updateUIForAuthState();
         loadEvents(); 
+        
+        // Notifications are initialized in notifications.js for all users
         
         // If on edit page, load event details
         if (window.location.pathname.includes('edit_event.html')) {
@@ -23,6 +26,9 @@ onAuthStateChanged(auth, (user) => {
         // Guest users can view calendar pages
         currentUser = null;
         updateUIForAuthState();
+        
+        // Guests can also receive notifications (for secretary/boss use case)
+        // Notifications are already initialized in notifications.js
         
         // Only redirect to login if trying to access create/edit pages
         if (window.location.pathname.includes('create_event.html') || 
@@ -134,6 +140,7 @@ if (createEventForm) {
         const endDateTime = document.getElementById('endDateTime').value;
         const location = document.getElementById('location').value;
         const categoryId = document.getElementById('category').value;
+        const alertTime = document.getElementById('alertTime').value;
         
         if (!categoryId) {
             alert('Please select a category');
@@ -153,7 +160,9 @@ if (createEventForm) {
                 location,
                 categoryId: categoryId,
                 categoryName: selectedCategory?.name || '',
-                categoryColor: selectedCategory?.color || '#3b82f6'
+                categoryColor: selectedCategory?.color || '#3b82f6',
+                alertTime: alertTime,
+                alertEnabled: alertTime !== 'none'
             });
             window.location.href = 'monthly_view.html';
         } catch (error) {
@@ -179,6 +188,7 @@ if (editEventForm) {
         const endDateTime = document.getElementById('endDateTime').value;
         const location = document.getElementById('location').value;
         const categoryId = document.getElementById('category').value;
+        const alertTime = document.getElementById('alertTime').value;
         
         if (!categoryId) {
             alert('Please select a category');
@@ -198,7 +208,9 @@ if (editEventForm) {
                 location,
                 categoryId: categoryId,
                 categoryName: selectedCategory?.name || '',
-                categoryColor: selectedCategory?.color || '#3b82f6'
+                categoryColor: selectedCategory?.color || '#3b82f6',
+                alertTime: alertTime,
+                alertEnabled: alertTime !== 'none'
             });
             window.location.href = 'monthly_view.html';
         } catch (error) {
@@ -254,6 +266,11 @@ async function loadEventDetails(eventId) {
             // Set category if exists
             if (data.categoryId) {
                 document.getElementById('category').value = data.categoryId;
+            }
+            
+            // Set alert time if exists
+            if (data.alertTime) {
+                document.getElementById('alertTime').value = data.alertTime;
             }
         } else {
             console.log("No such document!");
