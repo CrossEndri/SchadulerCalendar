@@ -11,5 +11,16 @@ service cloud.firestore {
       // Allow create if the user is authenticated and the new document's userId matches their UID
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
     }
+    
+    match /categories/{categoryId} {
+      // Allow anyone to read categories (guest access)
+      allow read: if true;
+      
+      // Allow update and delete only if the user is authenticated and owns the document
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Allow create if the user is authenticated
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
   }
 }

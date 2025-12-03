@@ -43,6 +43,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 const loginBtn = document.getElementById('loginBtn');
 const newEventBtn = document.getElementById('newEventBtn');
 const newEventLink = document.getElementById('newEventLink');
+const manageCategoriesLink = document.getElementById('manageCategoriesLink');
 
 function updateUIForAuthState() {
     if (currentUser) {
@@ -51,12 +52,14 @@ function updateUIForAuthState() {
         if (loginBtn) loginBtn.style.display = 'none';
         if (newEventBtn) newEventBtn.style.display = 'inline-block';
         if (newEventLink) newEventLink.style.display = 'inline-block';
+        if (manageCategoriesLink) manageCategoriesLink.style.display = 'inline-block';
     } else {
         // Guest user
         if (logoutBtn) logoutBtn.style.display = 'none';
         if (loginBtn) loginBtn.style.display = 'inline-block';
         if (newEventBtn) newEventBtn.style.display = 'none';
         if (newEventLink) newEventLink.style.display = 'none';
+        if (manageCategoriesLink) manageCategoriesLink.style.display = 'none';
     }
 }
 
@@ -77,6 +80,47 @@ if (loginBtn) {
     });
 }
 
+// Load categories for dropdowns
+let categoriesCache = [];
+
+async function loadCategoriesForDropdown() {
+    if (!currentUser) return;
+    
+    const categorySelect = document.getElementById('category');
+    if (!categorySelect) return;
+    
+    try {
+        const q = query(collection(db, "categories"), where("userId", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        
+        categoriesCache = [];
+        categorySelect.innerHTML = '<option value="">Select a category...</option>';
+        
+        querySnapshot.forEach((doc) => {
+            const category = doc.data();
+            categoriesCache.push({ id: doc.id, ...category });
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = category.name;
+            option.dataset.color = category.color;
+            categorySelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Error loading categories:", error);
+    }
+}
+
+// Load categories on page load for create/edit pages
+if (window.location.pathname.includes('create_event.html') || 
+    window.location.pathname.includes('edit_event.html')) {
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            loadCategoriesForDropdown();
+        }
+    });
+}
+
 // Create Event Logic
 const createEventForm = document.getElementById('createEventForm');
 if (createEventForm) {
@@ -89,6 +133,15 @@ if (createEventForm) {
         const startDateTime = document.getElementById('startDateTime').value;
         const endDateTime = document.getElementById('endDateTime').value;
         const location = document.getElementById('location').value;
+        const categoryId = document.getElementById('category').value;
+        
+        if (!categoryId) {
+            alert('Please select a category');
+            return;
+        }
+        
+        // Get category details
+        const selectedCategory = categoriesCache.find(c => c.id === categoryId);
 
         try {
             await addDoc(collection(db, "events"), {
@@ -97,7 +150,10 @@ if (createEventForm) {
                 description,
                 startDateTime: Timestamp.fromDate(new Date(startDateTime)),
                 endDateTime: Timestamp.fromDate(new Date(endDateTime)),
-                location
+                location,
+                categoryId: categoryId,
+                categoryName: selectedCategory?.name || '',
+                categoryColor: selectedCategory?.color || '#3b82f6'
             });
             window.location.href = 'monthly_view.html';
         } catch (error) {
@@ -122,6 +178,15 @@ if (editEventForm) {
         const startDateTime = document.getElementById('startDateTime').value;
         const endDateTime = document.getElementById('endDateTime').value;
         const location = document.getElementById('location').value;
+        const categoryId = document.getElementById('category').value;
+        
+        if (!categoryId) {
+            alert('Please select a category');
+            return;
+        }
+        
+        // Get category details
+        const selectedCategory = categoriesCache.find(c => c.id === categoryId);
 
         try {
             const eventRef = doc(db, "events", eventId);
@@ -130,7 +195,10 @@ if (editEventForm) {
                 description,
                 startDateTime: Timestamp.fromDate(new Date(startDateTime)),
                 endDateTime: Timestamp.fromDate(new Date(endDateTime)),
-                location
+                location,
+                categoryId: categoryId,
+                categoryName: selectedCategory?.name || '',
+                categoryColor: selectedCategory?.color || '#3b82f6'
             });
             window.location.href = 'monthly_view.html';
         } catch (error) {
@@ -182,6 +250,11 @@ async function loadEventDetails(eventId) {
             document.getElementById('startDateTime').value = formatDateTime(start);
             document.getElementById('endDateTime').value = formatDateTime(end);
             document.getElementById('location').value = data.location;
+            
+            // Set category if exists
+            if (data.categoryId) {
+                document.getElementById('category').value = data.categoryId;
+            }
         } else {
             console.log("No such document!");
             alert("Event not found");
@@ -247,7 +320,7 @@ function renderCalendar(date) {
             div.style.border = '2px solid var(--primary-color)';
         }
 
-        div.innerHTML = `<div style="font-weight: bold; margin-bottom: 5px;">${i}</div>`;
+        div.innerHTML = `<div class="calendar-day-number">${i}</div>`;
         div.dataset.date = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         
         // Click to go to daily view
@@ -407,33 +480,86 @@ async function loadEvents() {
         querySnapshot = await getDocs(q);
     }
     
-    querySnapshot.forEach((doc) => {
-        const event = doc.data();
-        const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
-        const eventHour = event.startDateTime.toDate().getHours();
-        const isOwnEvent = currentUser && currentUser.uid === event.userId;
-
-        // Monthly View
-        if (calendarGrid) {
+    // For monthly view, group events by date
+    if (calendarGrid) {
+        // First, clear all existing events from all day cells
+        document.querySelectorAll('.calendar-day').forEach(cell => {
+            // Remove all event-item and more-events elements
+            cell.querySelectorAll('.event-item, .more-events').forEach(el => el.remove());
+        });
+        
+        const eventsByDate = {};
+        
+        querySnapshot.forEach((doc) => {
+            const event = doc.data();
+            const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
+            
+            if (!eventsByDate[eventDate]) {
+                eventsByDate[eventDate] = [];
+            }
+            
+            eventsByDate[eventDate].push({
+                id: doc.id,
+                data: event,
+                time: event.startDateTime.toDate()
+            });
+        });
+        
+        // Process each date
+        Object.keys(eventsByDate).forEach(eventDate => {
             const dayCell = document.querySelector(`.calendar-day[data-date="${eventDate}"]`);
-            if (dayCell) {
+            if (!dayCell) return;
+            
+            // Sort events by time (earliest first)
+            const sortedEvents = eventsByDate[eventDate].sort((a, b) => a.time - b.time);
+            const totalEvents = sortedEvents.length;
+            
+            // Show only first 2 events
+            const eventsToShow = sortedEvents.slice(0, 2);
+            
+            eventsToShow.forEach(({ id, data: event }) => {
+                const isOwnEvent = currentUser && currentUser.uid === event.userId;
+                const eventColor = event.categoryColor || '#3b82f6';
+                
                 const eventDiv = document.createElement('div');
                 eventDiv.className = 'event-item';
                 eventDiv.textContent = event.title;
                 eventDiv.style.cursor = 'pointer';
+                eventDiv.style.backgroundColor = eventColor;
+                eventDiv.style.color = '#ffffff';
+                eventDiv.style.border = `2px solid ${eventColor}`;
                 
-                // Show detail modal for all events
                 eventDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    showEventDetailModal(doc.id, event, isOwnEvent);
+                    showEventDetailModal(id, event, isOwnEvent);
                 });
                 
                 dayCell.appendChild(eventDiv);
+            });
+            
+            // Add "+N more" indicator if there are more than 2 events
+            if (totalEvents > 2) {
+                const moreDiv = document.createElement('div');
+                moreDiv.className = 'more-events';
+                moreDiv.textContent = `+${totalEvents - 2} more`;
+                moreDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showAllEventsForDate(eventDate, sortedEvents);
+                });
+                dayCell.appendChild(moreDiv);
             }
-        }
-
-        // Weekly & Daily View
-        if (weeklyGrid || dailyGrid) {
+        });
+    }
+    
+    // Weekly & Daily View - show all events
+    if (weeklyGrid || dailyGrid) {
+        querySnapshot.forEach((doc) => {
+            const event = doc.data();
+            const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
+            const eventHour = event.startDateTime.toDate().getHours();
+            const isOwnEvent = currentUser && currentUser.uid === event.userId;
+            const eventColor = event.categoryColor || '#3b82f6';
+            
             const selector = `.day-column[data-date="${eventDate}"][data-hour="${eventHour}"]`;
             const cell = document.querySelector(selector);
             
@@ -443,8 +569,10 @@ async function loadEvents() {
                 eventDiv.textContent = `${event.title}`;
                 eventDiv.title = event.description || event.title;
                 eventDiv.style.cursor = 'pointer';
+                eventDiv.style.backgroundColor = eventColor;
+                eventDiv.style.color = '#ffffff';
+                eventDiv.style.border = `2px solid ${eventColor}`;
                 
-                // Show detail modal for all events
                 eventDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
                     showEventDetailModal(doc.id, event, isOwnEvent);
@@ -452,8 +580,96 @@ async function loadEvents() {
                 
                 cell.appendChild(eventDiv);
             }
-        }
+        });
+    }
+}
+
+// Show all events for a specific date in a modal
+function showAllEventsForDate(date, events) {
+    const modal = document.getElementById('eventDetailModal');
+    const modalContent = modal.querySelector('.modal-content');
+    
+    // Create custom content for all events view
+    modalContent.innerHTML = `
+        <span class="close-modal" id="closeAllEventsModal">&times;</span>
+        <h3>All Events - ${new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+        <div style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+            ${events.map(({ id, data: event }) => {
+                const isOwnEvent = currentUser && currentUser.uid === event.userId;
+                const eventColor = event.categoryColor || '#3b82f6';
+                const timeStr = event.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                return `
+                    <div class="event-item" style="background-color: ${eventColor}; color: #ffffff; border: 2px solid ${eventColor}; margin-bottom: 0.5rem; cursor: pointer;" 
+                         data-event-id="${id}">
+                        <strong>${timeStr}</strong> - ${event.title}
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <button id="closeAllEventsBtn" class="btn secondary">Close</button>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    // Add event listeners
+    document.getElementById('closeAllEventsModal').addEventListener('click', () => {
+        modal.style.display = 'none';
+        // Restore original modal content structure
+        restoreModalContent();
     });
+    
+    document.getElementById('closeAllEventsBtn').addEventListener('click', () => {
+        modal.style.display = 'none';
+        restoreModalContent();
+    });
+    
+    // Click on individual events to show details
+    modalContent.querySelectorAll('.event-item[data-event-id]').forEach(item => {
+        item.addEventListener('click', () => {
+            const eventId = item.dataset.eventId;
+            const eventData = events.find(e => e.id === eventId);
+            if (eventData) {
+                const isOwnEvent = currentUser && currentUser.uid === eventData.data.userId;
+                showEventDetailModal(eventId, eventData.data, isOwnEvent);
+            }
+        });
+    });
+}
+
+function restoreModalContent() {
+    const modal = document.getElementById('eventDetailModal');
+    const modalContent = modal.querySelector('.modal-content');
+    
+    modalContent.innerHTML = `
+        <span class="close-modal" id="closeDetailModal">&times;</span>
+        <h3 id="detailTitle">Event Details</h3>
+        <div style="margin-top: 1rem;">
+            <p><strong>Title:</strong> <span id="detailEventTitle"></span></p>
+            <p><strong>Date & Time:</strong> <span id="detailEventDateTime"></span></p>
+            <p><strong>Location:</strong> <span id="detailEventLocation"></span></p>
+            <p><strong>Description:</strong></p>
+            <p id="detailEventDescription" style="white-space: pre-wrap;"></p>
+        </div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <button id="editEventBtn" class="btn primary" style="display: none;">Edit Event</button>
+            <button id="closeDetailBtn" class="btn secondary">Close</button>
+        </div>
+    `;
+    
+    // Re-attach event listeners
+    const closeDetailModal = document.getElementById('closeDetailModal');
+    const closeDetailBtn = document.getElementById('closeDetailBtn');
+    
+    if (closeDetailModal) {
+        closeDetailModal.addEventListener('click', closeEventDetailModal);
+    }
+    
+    if (closeDetailBtn) {
+        closeDetailBtn.addEventListener('click', closeEventDetailModal);
+    }
 }
 
 // Event Detail Modal Logic
