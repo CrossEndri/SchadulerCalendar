@@ -129,19 +129,64 @@ async function checkUpcomingEvents() {
     }
 }
 
+// Show notification permission modal
+function showNotificationPermissionModal() {
+    const modal = document.getElementById('notificationPermissionModal');
+    if (!modal) return;
+    
+    modal.style.display = 'flex';
+    
+    // Handle "Enable Notifications" button
+    const enableBtn = document.getElementById('notificationEnableBtn');
+    const laterBtn = document.getElementById('notificationLaterBtn');
+    
+    if (enableBtn) {
+        enableBtn.onclick = async () => {
+            modal.style.display = 'none';
+            localStorage.setItem('notificationPermissionAsked', 'true');
+            
+            const hasPermission = await requestNotificationPermission();
+            if (hasPermission) {
+                // Start checking for events
+                checkUpcomingEvents();
+                if (notificationCheckInterval) {
+                    clearInterval(notificationCheckInterval);
+                }
+                notificationCheckInterval = setInterval(checkUpcomingEvents, 60 * 1000);
+            }
+        };
+    }
+    
+    if (laterBtn) {
+        laterBtn.onclick = () => {
+            modal.style.display = 'none';
+            localStorage.setItem('notificationPermissionAsked', 'true');
+        };
+    }
+}
+
 // Initialize notification system
 async function initializeNotifications() {
-    const hasPermission = await requestNotificationPermission();
+    // Check if we've already asked the user
+    const hasAsked = localStorage.getItem('notificationPermissionAsked');
     
-    if (hasPermission) {
-        // Check immediately
+    // If permission is already granted, just start checking
+    if (Notification.permission === 'granted') {
+        notificationPermission = true;
         checkUpcomingEvents();
-        
-        // Check every minute (works for both logged-in and guest users)
         if (notificationCheckInterval) {
             clearInterval(notificationCheckInterval);
         }
         notificationCheckInterval = setInterval(checkUpcomingEvents, 60 * 1000);
+        return;
+    }
+    
+    // If we haven't asked yet and permission is not denied, show modal
+    if (!hasAsked && Notification.permission !== 'denied') {
+        // Small delay to let the page load first
+        setTimeout(() => {
+            showNotificationPermissionModal();
+        }, 1000);
     }
 }
 
@@ -166,6 +211,7 @@ onAuthStateChanged(auth, (user) => {
 export {
     requestNotificationPermission,
     showNotification,
+    showNotificationPermissionModal,
     getAlertTimeLabel,
     checkUpcomingEvents,
     initializeNotifications,
