@@ -87,6 +87,7 @@ async function checkUpcomingEvents() {
     const { collection, query, where, getDocs, Timestamp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
 
     const now = new Date();
+    const pastTime = new Date(now.getTime() - 5 * 60 * 1000); // Look back 5 minutes
     const futureTime = new Date(now.getTime() + 2 * 60 * 1000); // Check 2 minutes ahead
 
     try {
@@ -104,8 +105,8 @@ async function checkUpcomingEvents() {
             const alertOffset = ALERT_TIMES[event.alertTime] || 0;
             const alertTime = new Date(eventTime.getTime() - alertOffset);
             
-            // Check if alert time is within the next 2 minutes
-            if (alertTime >= now && alertTime <= futureTime) {
+            // Check if alert time is within the window (5 minutes past to 2 minutes future)
+            if (alertTime >= pastTime && alertTime <= futureTime) {
                 // Check if we haven't already shown this notification
                 const notificationKey = `notified_${doc.id}_${event.alertTime}`;
                 if (!sessionStorage.getItem(notificationKey)) {

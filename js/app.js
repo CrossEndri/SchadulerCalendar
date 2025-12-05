@@ -440,6 +440,15 @@ function renderDaily(date) {
         cell.dataset.hour = hour;
         dailyGrid.appendChild(cell);
     }
+    
+    // Scroll to current time
+    const currentHour = new Date().getHours();
+    // Find the element for the current hour (using the time label or the cell)
+    // The time labels are added before the cells in the loop, so we can target the time-slot with the text content
+    const timeSlots = dailyGrid.querySelectorAll('.time-slot');
+    if (timeSlots.length > currentHour) {
+        timeSlots[currentHour].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     loadEvents();
 }
 
@@ -561,7 +570,7 @@ async function loadEvents() {
                 moreDiv.textContent = `+${totalEvents - 2} more`;
                 moreDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    showAllEventsForDate(eventDate, sortedEvents);
+                    window.location.href = `daily_view.html?date=${eventDate}`;
                 });
                 dayCell.appendChild(moreDiv);
             }
