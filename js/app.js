@@ -130,6 +130,30 @@ if (window.location.pathname.includes('create_event.html') ||
 // Create Event Logic
 const createEventForm = document.getElementById('createEventForm');
 if (createEventForm) {
+    // Add real-time validation for end date/time
+    const startDateTimeInput = document.getElementById('startDateTime');
+    const endDateTimeInput = document.getElementById('endDateTime');
+    
+    if (startDateTimeInput && endDateTimeInput) {
+        // Update end date minimum when start date changes
+        startDateTimeInput.addEventListener('change', () => {
+            endDateTimeInput.min = startDateTimeInput.value;
+            
+            // If end time is now before start time, update it
+            if (endDateTimeInput.value && endDateTimeInput.value < startDateTimeInput.value) {
+                endDateTimeInput.value = startDateTimeInput.value;
+            }
+        });
+        
+        // Validate on end date change
+        endDateTimeInput.addEventListener('change', () => {
+            if (startDateTimeInput.value && endDateTimeInput.value < startDateTimeInput.value) {
+                alert('End date/time cannot be before start date/time');
+                endDateTimeInput.value = startDateTimeInput.value;
+            }
+        });
+    }
+    
     createEventForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!currentUser) return;
@@ -144,6 +168,12 @@ if (createEventForm) {
         
         if (!categoryId) {
             alert('Please select a category');
+            return;
+        }
+        
+        // Validate end date is not before start date
+        if (new Date(endDateTime) < new Date(startDateTime)) {
+            alert('End date/time cannot be before start date/time');
             return;
         }
         
@@ -177,6 +207,30 @@ const editEventForm = document.getElementById('editEventForm');
 const deleteEventBtn = document.getElementById('deleteEventBtn');
 
 if (editEventForm) {
+    // Add real-time validation for end date/time
+    const startDateTimeInput = document.getElementById('startDateTime');
+    const endDateTimeInput = document.getElementById('endDateTime');
+    
+    if (startDateTimeInput && endDateTimeInput) {
+        // Update end date minimum when start date changes
+        startDateTimeInput.addEventListener('change', () => {
+            endDateTimeInput.min = startDateTimeInput.value;
+            
+            // If end time is now before start time, update it
+            if (endDateTimeInput.value && endDateTimeInput.value < startDateTimeInput.value) {
+                endDateTimeInput.value = startDateTimeInput.value;
+            }
+        });
+        
+        // Validate on end date change
+        endDateTimeInput.addEventListener('change', () => {
+            if (startDateTimeInput.value && endDateTimeInput.value < startDateTimeInput.value) {
+                alert('End date/time cannot be before start date/time');
+                endDateTimeInput.value = startDateTimeInput.value;
+            }
+        });
+    }
+    
     editEventForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!currentUser) return;
@@ -192,6 +246,12 @@ if (editEventForm) {
         
         if (!categoryId) {
             alert('Please select a category');
+            return;
+        }
+        
+        // Validate end date is not before start date
+        if (new Date(endDateTime) < new Date(startDateTime)) {
+            alert('End date/time cannot be before start date/time');
             return;
         }
         
