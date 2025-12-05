@@ -373,12 +373,22 @@ function renderWeekly(date) {
     weeklyGrid.appendChild(timeHeader);
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
     for (let i = 0; i < 7; i++) {
         const dayDate = new Date(startOfWeek);
         dayDate.setDate(startOfWeek.getDate() + i);
+        const dateStr = dayDate.toISOString().split('T')[0];
         const div = document.createElement('div');
         div.className = 'day-header';
         div.textContent = `${days[i]} ${dayDate.getDate()}`;
+        
+        // Highlight today
+        if (dateStr === todayStr) {
+            div.classList.add('today-header');
+        }
+        
         weeklyGrid.appendChild(div);
     }
 
@@ -401,6 +411,12 @@ function renderWeekly(date) {
             cell.style.borderBottom = '1px solid var(--border-color)';
             cell.dataset.date = dateStr;
             cell.dataset.hour = hour;
+            
+            // Highlight today's column
+            if (dateStr === todayStr) {
+                cell.classList.add('today-column');
+            }
+            
             weeklyGrid.appendChild(cell);
         }
     }
@@ -508,6 +524,9 @@ async function loadEvents() {
     
     // For monthly view, group events by date
     if (calendarGrid) {
+        console.log('Loading events for monthly view...');
+        console.log('Total events:', querySnapshot.size);
+        
         // First, clear all existing events from all day cells
         document.querySelectorAll('.calendar-day').forEach(cell => {
             // Remove all event-item and more-events elements
@@ -531,10 +550,18 @@ async function loadEvents() {
             });
         });
         
+        console.log('Events by date:', eventsByDate);
+        
         // Process each date
         Object.keys(eventsByDate).forEach(eventDate => {
             const dayCell = document.querySelector(`.calendar-day[data-date="${eventDate}"]`);
-            if (!dayCell) return;
+            
+            if (!dayCell) {
+                console.log(`No cell found for date: ${eventDate}`);
+                return;
+            }
+            
+            console.log(`Adding ${eventsByDate[eventDate].length} events to ${eventDate}`);
             
             // Sort events by time (earliest first)
             const sortedEvents = eventsByDate[eventDate].sort((a, b) => a.time - b.time);
@@ -577,22 +604,59 @@ async function loadEvents() {
         });
     }
     
-    // Weekly & Daily View - show all events
-    if (weeklyGrid || dailyGrid) {
+    
+    // Weekly View - show events with grouping
+    if (weeklyGrid) {
+        // First, clear all day-column cells
+        document.querySelectorAll('.day-column').forEach(cell => {
+            cell.innerHTML = '';
+        });
+        
+        // Group events by date and hour for weekly view
+        const eventsByDateHour = {};
+        
         querySnapshot.forEach((doc) => {
             const event = doc.data();
             const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
             const eventHour = event.startDateTime.toDate().getHours();
-            const isOwnEvent = currentUser && currentUser.uid === event.userId;
-            const eventColor = event.categoryColor || '#3b82f6';
+            const key = `${eventDate}|${eventHour}`; // Use pipe separator to avoid conflicts with date dashes
             
+            if (!eventsByDateHour[key]) {
+                eventsByDateHour[key] = [];
+            }
+            
+            eventsByDateHour[key].push({
+                id: doc.id,
+                data: event,
+                time: event.startDateTime.toDate()
+            });
+        });
+        
+        // Process each date-hour combination
+        Object.keys(eventsByDateHour).forEach(key => {
+            const [eventDate, eventHour] = key.split('|'); // Split by pipe
             const selector = `.day-column[data-date="${eventDate}"][data-hour="${eventHour}"]`;
             const cell = document.querySelector(selector);
             
-            if (cell) {
+            if (!cell) {
+                console.log(`Cell not found for ${eventDate} at hour ${eventHour}`);
+                return;
+            }
+            
+            // Sort events by time
+            const sortedEvents = eventsByDateHour[key].sort((a, b) => a.time - b.time);
+            const totalEvents = sortedEvents.length;
+            
+            // Show only first 2 events
+            const eventsToShow = sortedEvents.slice(0, 2);
+            
+            eventsToShow.forEach(({ id, data: event }) => {
+                const isOwnEvent = currentUser && currentUser.uid === event.userId;
+                const eventColor = event.categoryColor || '#3b82f6';
+                
                 const eventDiv = document.createElement('div');
                 eventDiv.className = 'event-block';
-                eventDiv.textContent = `${event.title}`;
+                eventDiv.textContent = event.title;
                 eventDiv.title = event.description || event.title;
                 eventDiv.style.cursor = 'pointer';
                 eventDiv.style.backgroundColor = eventColor;
@@ -601,11 +665,100 @@ async function loadEvents() {
                 
                 eventDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    showEventDetailModal(doc.id, event, isOwnEvent);
+                    showEventDetailModal(id, event, isOwnEvent);
                 });
                 
                 cell.appendChild(eventDiv);
+            });
+            
+            // Add "+N more" indicator if there are more than 2 events
+            if (totalEvents > 2) {
+                const moreDiv = document.createElement('div');
+                moreDiv.className = 'more-events';
+                moreDiv.textContent = `+${totalEvents - 2} more`;
+                moreDiv.style.marginTop = 'auto';
+                moreDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.location.href = `daily_view.html?date=${eventDate}`;
+                });
+                cell.appendChild(moreDiv);
             }
+        });
+    }
+    
+    
+    // Daily View - show all events with auto-expanding cells
+    if (dailyGrid) {
+        // Group events by hour
+        const eventsByHour = {};
+        
+        querySnapshot.forEach((doc) => {
+            const event = doc.data();
+            const eventDate = event.startDateTime.toDate().toISOString().split('T')[0];
+            const eventHour = event.startDateTime.toDate().getHours();
+            
+            if (!eventsByHour[eventHour]) {
+                eventsByHour[eventHour] = [];
+            }
+            
+            eventsByHour[eventHour].push({
+                id: doc.id,
+                data: event,
+                date: eventDate,
+                time: event.startDateTime.toDate()
+            });
+        });
+        
+        // Process each hour
+        Object.keys(eventsByHour).forEach(hour => {
+            const events = eventsByHour[hour];
+            
+            // Get the cell for this hour
+            const cells = document.querySelectorAll(`.day-column[data-hour="${hour}"]`);
+            
+            cells.forEach(cell => {
+                const cellDate = cell.dataset.date;
+                
+                // Filter events for this specific date
+                const cellEvents = events.filter(e => e.date === cellDate);
+                
+                if (cellEvents.length === 0) return;
+                
+                // Clear existing content
+                cell.innerHTML = '';
+                
+                // Sort events by time
+                const sortedEvents = cellEvents.sort((a, b) => a.time - b.time);
+                
+                // Calculate required height (base + events)
+                const baseHeight = 80;
+                const eventHeight = 28; // Approximate height per event
+                const requiredHeight = Math.max(baseHeight, 40 + (sortedEvents.length * eventHeight));
+                cell.style.height = `${requiredHeight}px`;
+                cell.style.minHeight = `${requiredHeight}px`;
+                
+                // Add all events
+                sortedEvents.forEach(({ id, data: event }) => {
+                    const isOwnEvent = currentUser && currentUser.uid === event.userId;
+                    const eventColor = event.categoryColor || '#3b82f6';
+                    
+                    const eventDiv = document.createElement('div');
+                    eventDiv.className = 'event-block';
+                    eventDiv.textContent = event.title;
+                    eventDiv.title = event.description || event.title;
+                    eventDiv.style.cursor = 'pointer';
+                    eventDiv.style.backgroundColor = eventColor;
+                    eventDiv.style.color = '#ffffff';
+                    eventDiv.style.border = `2px solid ${eventColor}`;
+                    
+                    eventDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showEventDetailModal(id, event, isOwnEvent);
+                    });
+                    
+                    cell.appendChild(eventDiv);
+                });
+            });
         });
     }
 }
