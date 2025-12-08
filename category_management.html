@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Categories - Calendar App</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="calendar-header">
+            <h2>Manage Categories</h2>
+            <div class="view-controls">
+                <a href="monthly_view.html"><button class="secondary-btn">Back to Calendar</button></a>
+                <button id="logoutBtn" class="secondary-btn">Logout</button>
+            </div>
+        </div>
+
+        <div style="background: var(--white); padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
+            <h3>Add New Category</h3>
+            <form id="addCategoryForm" style="display: flex; gap: 1rem; align-items: flex-end; margin-top: 1rem;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label for="categoryName">Category Name</label>
+                    <input type="text" id="categoryName" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="categoryColor">Color</label>
+                    <input type="color" id="categoryColor" value="#3b82f6" style="height: 42px; padding: 0.25rem;">
+                </div>
+                <button type="submit" style="width: auto;">Add Category</button>
+            </form>
+        </div>
+
+        <div style="background: var(--white); padding: 2rem; border-radius: 8px;">
+            <h3>Your Categories</h3>
+            <div id="categoriesList" style="margin-top: 1rem;">
+                <!-- Categories will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Edit Category Modal -->
+        <div id="editCategoryModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal" id="closeEditModal">&times;</span>
+                <h3>Edit Category</h3>
+                <form id="editCategoryForm" style="margin-top: 1rem;">
+                    <input type="hidden" id="editCategoryId">
+                    <div class="form-group">
+                        <label for="editCategoryName">Category Name</label>
+                        <input type="text" id="editCategoryName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCategoryColor">Color</label>
+                        <input type="color" id="editCategoryColor" style="height: 42px; padding: 0.25rem;">
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                        <button type="submit" class="btn primary">Save Changes</button>
+                        <button type="button" id="cancelEditBtn" class="btn secondary">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="js/categories.js"></script>
+</body>
+
+</html>
